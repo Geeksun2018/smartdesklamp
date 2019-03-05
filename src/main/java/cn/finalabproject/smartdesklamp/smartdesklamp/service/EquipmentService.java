@@ -10,4 +10,12 @@ public interface EquipmentService {
     public boolean updateEquipment(Equipment equipment);
 
     public Equipment queryEquipmentById(Integer id);
+
+    public void switchMode(Integer type,Integer eid);
+
+    public void adjustBrightness(Integer brightness,Integer eid);
+
+    public boolean alterCurrentMusicId(Integer eid,Integer musicId);
+
+    public Integer getCurrentMusicId(Integer eid);
 }

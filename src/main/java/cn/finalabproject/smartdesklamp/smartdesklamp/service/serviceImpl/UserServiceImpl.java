@@ -1,8 +1,11 @@
 package cn.finalabproject.smartdesklamp.smartdesklamp.service.serviceImpl;
 
-import cn.finalabproject.smartdesklamp.smartdesklamp.entity.UserInfoEntity;
+import cn.finalabproject.smartdesklamp.smartdesklamp.mapper.BackgroundMapper;
+import cn.finalabproject.smartdesklamp.smartdesklamp.mapper.MusicMapper;
 import cn.finalabproject.smartdesklamp.smartdesklamp.mapper.UserInfoMapper;
 import cn.finalabproject.smartdesklamp.smartdesklamp.mapper.UserMapper;
+import cn.finalabproject.smartdesklamp.smartdesklamp.model.Background;
+import cn.finalabproject.smartdesklamp.smartdesklamp.model.Music;
 import cn.finalabproject.smartdesklamp.smartdesklamp.model.User;
 import cn.finalabproject.smartdesklamp.smartdesklamp.model.UserInfo;
 import cn.finalabproject.smartdesklamp.smartdesklamp.service.UserService;
@@ -19,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -31,7 +35,10 @@ public class UserServiceImpl implements UserService {
     private UserMapper userMapper;
     @Autowired
     private UserInfoMapper userInfoMapper;
-
+    @Autowired
+    private BackgroundMapper backgroundMapper;
+    @Autowired
+    private MusicMapper musicMapper;
 
 
     @Override
@@ -71,6 +78,12 @@ public class UserServiceImpl implements UserService {
         return userMapper.getUserByUserName(userName);
     }
 
+    @Override
+    public Integer[] getAllUserIdList() {
+        Integer[] integers=userMapper.getAllUserIdList();
+        return integers;
+    }
+
 
     @Override
     public void register(User user)
@@ -85,12 +98,28 @@ public class UserServiceImpl implements UserService {
     }
 
 
+    /**
+     * 修改 性别 昵称 年龄 地区 信息
+     * @param userInfo
+     * @return
+     */
     @Override
     public boolean alterUserInfo(UserInfo userInfo) {
-        //判断是否为本人操作
+        UserInfo d=userInfoMapper.getUserInfoById(userInfo.getId());
+        if (userInfo.getSex()==null){
+            userInfo.setSex(d.getSex());
+        }
+        if (userInfo.getAge()==null){
+            userInfo.setAge(d.getAge());
+        }
+        if (userInfo.getNickName()==null){
+            userInfo.setNickName(d.getNickName());
+        }
+        if (userInfo.getRegion()==null){
+            userInfo.setRegion(d.getRegion());
+        }
         userInfoMapper.alterUserInfo(userInfo);
         return true;
-
     }
 
     @Override
@@ -105,6 +134,20 @@ public class UserServiceImpl implements UserService {
         return userMapper.getUserByUserId(valueOf);
     }
 
+    @Override
+    public boolean alterBackground(Integer id, String backgroundPath) {
+        return userInfoMapper.alterBackground(id,backgroundPath);
+    }
+
+    @Override
+    public boolean alterEquipmentId(Integer eid, Integer id) {
+        return userInfoMapper.alterEquipmentId(eid,id);
+    }
+
+    @Override
+    public Integer getUserIdByEid(Integer eid) {
+        return userInfoMapper.getUserIdByEid(eid);
+    }
 
     @Override
     public boolean saveUserHeadPortrait(MultipartFile multipartFile, Integer id) {
@@ -116,7 +159,9 @@ public class UserServiceImpl implements UserService {
         String url=null;
         try {
             inputStream=multipartFile.getInputStream();
-            url=saveUserHeadPortrait(inputStream,username);
+            url = uploadFileAndGetUrl(inputStream,"head_portrait/"+username+"_headportrait");
+            //写了一个通用函数
+            //url=saveUserHeadPortrait(inputStream,username);
         }catch (IOException e){
             e.printStackTrace();
         }
@@ -126,9 +171,61 @@ public class UserServiceImpl implements UserService {
         return false;
     }
 
-    private  String saveUserHeadPortrait(InputStream inputStream,String username){
+    @Override
+    public Integer saveUserBackground(MultipartFile multipartFile, Integer id,Integer flag) {
+        String username=userMapper.getUserByUserId(id).getUsername();
+        if (username==null){
+            return -1;
+        }
+        String url=null;
+        InputStream inputStream = null;
         try {
-            String url= COSUtils.addFile("head_portrait/"+username+"_headportrait",inputStream);
+            inputStream=multipartFile.getInputStream();
+            url = uploadFileAndGetUrl(inputStream,"background/"+ username + "_"+UUID.randomUUID());
+            //写了通用的函数
+            //url=saveBackground(inputStream,username);
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+        if (url!=null) {
+            Background background = new Background();
+            background.setImagePath(url);
+            background.setFlag(1);
+            background.setUid(id);
+            backgroundMapper.insertBackground(background);
+            return background.getBid();
+        }
+        return -1;
+    }
+
+    @Override
+    public Integer saveUserMusic(MultipartFile multipartFile,Integer id,String musicName) {
+        String username = userMapper.getUserByUserId(id).getUsername();
+        String url=null;
+        InputStream inputStream = null;
+        if (username==null){
+            return -1;
+        }
+        try {
+            inputStream=multipartFile.getInputStream();
+            url = uploadFileAndGetUrl(inputStream,"music/"+ username + "_musicName_"+UUID.randomUUID() + musicName);
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+        if(url!=null){
+            Music music = new Music();
+            music.setUid(id);
+            music.setMusicUrl(url);
+            music.setMusicName(musicName);
+            musicMapper.insertMusic(music);
+            return music.getId();
+        }
+        return -1;
+    }
+
+    private String uploadFileAndGetUrl(InputStream inputStream,String key){
+        try {
+            String url= COSUtils.addFile(key,inputStream);
             return url;
         }finally {
             try {
@@ -138,6 +235,32 @@ public class UserServiceImpl implements UserService {
             }
         }
     }
+
+//    private  String saveUserHeadPortrait(InputStream inputStream,String username){
+//        try {
+//            String url= COSUtils.addFile("head_portrait/"+username+"_headportrait",inputStream);
+//            return url;
+//        }finally {
+//            try {
+//                inputStream.close();
+//            }catch (Exception e){
+//                e.printStackTrace();
+//            }
+//        }
+//    }
+//
+//    private String saveBackground(InputStream inputStream,String username){
+//        try {
+//            String url= COSUtils.addFile("background/"+ username + "_"+UUID.randomUUID(),inputStream);
+//            return url;
+//        }finally {
+//            try {
+//                inputStream.close();
+//            }catch (Exception e){
+//                e.printStackTrace();
+//            }
+//        }
+//    }
 
     public String produceSalt()
     {
@@ -151,6 +274,4 @@ public class UserServiceImpl implements UserService {
         }
         return randomString.toString();
     }
-
-
 }

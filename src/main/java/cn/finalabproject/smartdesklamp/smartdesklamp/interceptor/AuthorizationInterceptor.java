@@ -6,7 +6,6 @@ import cn.finalabproject.smartdesklamp.smartdesklamp.model.ExcludeURI;
 import cn.finalabproject.smartdesklamp.smartdesklamp.service.RedisService;
 import cn.finalabproject.smartdesklamp.smartdesklamp.service.UserService;
 import cn.finalabproject.smartdesklamp.smartdesklamp.utils.JwtUtils;
-
 import com.auth0.jwt.interfaces.Claim;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,24 +42,30 @@ public class AuthorizationInterceptor extends HandlerInterceptorAdapter {
         if (isExclude(url)){
             return true;
         }
+
         //获取请求头部中的token
         String token=request.getHeader("Authorization");
         if (token!=null){
 
             //解密token
             Map<String, Claim> map= JwtUtils.VerifyToken(token);
+            if (map==null){
+                writeErrorInfo(response);
+                return false;
+            }
             String uuid=map.get("uuid").asString();
             String id=map.get("id").asString();
 
             //判断token是否有效
             if (uuid!=null&&id!=null&&redisService.exists("user:"+id)){
                 request.setAttribute("user",userService.getUserByUserId(Integer.valueOf(id)));
+                request.setAttribute("userInfo",userService.getUserInfo(Integer.valueOf(id)));
                 request.setAttribute("id",Integer.valueOf(id));
                 String ret=(String) redisService.get("user:"+id);
                 if (ret.equals(uuid)||true){
                     //更新过期时间,连续七天不活动则token失效
                     redisService.expire("user:"+id,60*60*24*7);
-                    RedisSession redisSession=RedisSession.getInstance(uuid,Long.valueOf(id));
+                    RedisSession redisSession= RedisSession.getInstance(uuid,Long.valueOf(id));
                     if (redisSession!=null){
                         request.setAttribute("redisSession",redisSession);
                     }
@@ -73,10 +78,20 @@ public class AuthorizationInterceptor extends HandlerInterceptorAdapter {
             }
         }
         //否则提示token过期,要求重新登录
-        Writer writer=response.getWriter();
-        writer.write(RetJson.fail(-2,"token已过期,请重新登入").toString());
-        writer.flush();
+        writeErrorInfo(response);
         return false;
+
+    }
+
+    private void writeErrorInfo(HttpServletResponse response){
+        try {
+            Writer writer=response.getWriter();
+            writer.write(RetJson.fail(-2,"token已过期,请重新登入").toString());
+            writer.flush();
+        }catch (Exception e){
+
+        }
+        return;
     }
 
     public boolean isExclude(String uri){

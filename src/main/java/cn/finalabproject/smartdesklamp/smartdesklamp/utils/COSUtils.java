@@ -36,6 +36,13 @@ public class COSUtils {
                 e.printStackTrace();
             }
         }
-        return "https://smartmeetingroom-1257009269.cos.ap-guangzhou.myqcloud.com/"+key;
+        return "https://smartdesklamp-1257009269.cos.ap-guangzhou.myqcloud.com/"+key;
+    }
+    //删除文件
+    public static void deleteFile(String key){
+        COSCredentials cred = new BasicCOSCredentials(secretId,secretKey);
+        ClientConfig clientConfig = new ClientConfig(new Region(region_name));
+        COSClient cosClient = new COSClient(cred, clientConfig);
+        cosClient.deleteObject(bucketName, key);
     }
 }
